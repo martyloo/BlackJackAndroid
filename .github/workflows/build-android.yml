@@ -1,4 +1,4 @@
-name: Build Android App
+name: Build Android APK
 
 on:
   workflow_dispatch:
@@ -11,14 +11,25 @@ jobs:
       - name: Download project
         uses: actions/checkout@v4
 
+      - name: Pull official Buildozer image
+        run: docker pull ghcr.io/kivy/buildozer:latest
+
       - name: Build Android APK
-        uses: ArtemSBulgakov/buildozer-action@v1
-        with:
-          command: buildozer android debug
-          buildozer_version: stable
+        run: |
+          docker run --rm \
+            --volume "${{ github.workspace }}:/home/user/hostcwd" \
+            ghcr.io/kivy/buildozer:latest \
+            android debug
+
+      - name: Show generated files
+        if: always()
+        run: |
+          echo "Files in project:"
+          find . -maxdepth 4 -type f | sort
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: blackjack-android-apk
           path: bin/*.apk
+          if-no-files-found: error
