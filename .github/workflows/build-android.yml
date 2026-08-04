@@ -14,8 +14,10 @@ jobs:
       - name: Restore upload key
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > blackjack-upload-key.jks
+          ls -lh blackjack-upload-key.jks
 
       - name: Build Android App Bundle
+        id: buildozer
         uses: ArtemSBulgakov/buildozer-action@v1
         env:
           P4A_RELEASE_KEYSTORE: ${{ github.workspace }}/blackjack-upload-key.jks
@@ -23,11 +25,12 @@ jobs:
           P4A_RELEASE_KEYALIAS: ${{ secrets.KEY_ALIAS }}
           P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.KEY_PASSWORD }}
         with:
-          command: buildozer android release
+          command: buildozer -v android release
+          workdir: .
           buildozer_version: stable
 
       - name: Upload Android App Bundle
         uses: actions/upload-artifact@v4
         with:
           name: blackjack-google-play-aab
-          path: bin/*.aab
+          path: ${{ steps.buildozer.outputs.filename }}
