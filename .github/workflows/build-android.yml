@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android Release
 
 on:
   workflow_dispatch:
@@ -11,25 +11,23 @@ jobs:
       - name: Download project
         uses: actions/checkout@v4
 
-      - name: Pull official Buildozer image
-        run: docker pull ghcr.io/kivy/buildozer:latest
-
-      - name: Build Android APK
+      - name: Restore upload key
         run: |
-          docker run --rm \
-            --volume "${{ github.workspace }}:/home/user/hostcwd" \
-            ghcr.io/kivy/buildozer:latest \
-            android debug
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > blackjack-upload-key.jks
 
-      - name: Show generated files
-        if: always()
-        run: |
-          echo "Files in project:"
-          find . -maxdepth 4 -type f | sort
+      - name: Build Android App Bundle
+        uses: ArtemSBulgakov/buildozer-action@v1
+        env:
+          P4A_RELEASE_KEYSTORE: ${{ github.workspace }}/blackjack-upload-key.jks
+          P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.KEYSTORE_PASSWORD }}
+          P4A_RELEASE_KEYALIAS: ${{ secrets.KEY_ALIAS }}
+          P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.KEY_PASSWORD }}
+        with:
+          command: buildozer android release
+          buildozer_version: stable
 
-      - name: Upload APK
+      - name: Upload Android App Bundle
         uses: actions/upload-artifact@v4
         with:
-          name: blackjack-android-apk
-          path: bin/*.apk
-          if-no-files-found: error
+          name: blackjack-google-play-aab
+          path: bin/*.aab
