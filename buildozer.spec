@@ -28,7 +28,7 @@ orientation = portrait
 fullscreen = 1
 
 # Add these after creating the artwork.
-# icon.filename = %(source.dir)s/icon.png
+icon.filename = %(source.dir)s/icon.png
 # presplash.filename = %(source.dir)s/presplash.png
 
 # Android versions.
