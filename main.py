@@ -10,8 +10,10 @@ from kivy.uix.textinput import TextInput
 from kivy.utils import platform
 
 
-# Desktop preview only. Android automatically uses the phone's screen size.
-Window.size = (360, 800)
+# Use a 360x800 preview window only on desktop.
+# On Android, do NOT force Window.size — Android must provide the full device screen.
+if platform != "android":
+    Window.size = (360, 800)
 
 
 
