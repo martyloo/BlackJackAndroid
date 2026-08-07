@@ -30,10 +30,10 @@ def light_haptic_feedback(*args):
         VibrationEffect = autoclass("android.os.VibrationEffect")
         vibrator = PythonActivity.mActivity.getSystemService(Context.VIBRATOR_SERVICE)
         if Build_VERSION.SDK_INT >= 26:
-            # 10 ms at low amplitude: intentionally subtle.
-            vibrator.vibrate(VibrationEffect.createOneShot(10, 35))
+            # Short, crisp press feedback that remains subtle but is actually noticeable.
+            vibrator.vibrate(VibrationEffect.createOneShot(15, VibrationEffect.DEFAULT_AMPLITUDE))
         else:
-            vibrator.vibrate(10)
+            vibrator.vibrate(15)
     except Exception:
         pass
 
@@ -116,6 +116,7 @@ class ButtonBox:
             background_color=(0.20, 0.24, 0.30, 1),
             color=(1, 1, 1, 1),
         )
+        self.widget.bind(on_press=light_haptic_feedback)
 
     def setEnabled(self, enabled):
         self.widget.disabled = not enabled
@@ -186,6 +187,7 @@ class MyWidget(BoxLayout):
         self.true_count_box = TextBox('0', font_size='11sp')
         self.decks_combo = ComboBox(['1', '2', '3', '4', '5', '6', '7', '8'])
         self.decks_combo.currentIndexChanged_connect(self.select_decks)
+        self.top_value_box.on_change(self.update_new_value_box)
 
         metrics = GridLayout(cols=3, spacing=dp(4), size_hint_y=None, height=dp(108))
         self._field_pair(metrics, 'Cards dealt', self.top_value_box)
@@ -303,7 +305,8 @@ class MyWidget(BoxLayout):
     def add_one_to_top_value_box(self):
         current_value = int(self.top_value_box.text())
         self.top_value_box.setText(str(current_value + 1))
-        self.update_true_count()
+        # top_value_box is bound to update_new_value_box(), which refreshes
+        # Cards Left, Decks Left and then the True Count.
         
     def subtract_one(self):
         self.original_value -= 1
@@ -1188,8 +1191,6 @@ class BlackjackApp(App):
 
 
 
-    def on_start(self):
-        enable_haptics_for_buttons(self.root)
 
 
 if __name__ == '__main__':
