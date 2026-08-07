@@ -1,31 +1,72 @@
 from kivy.app import App
 from kivy.core.window import Window
-from kivy.metrics import dp
-from kivy.utils import platform
+from kivy.metrics import dp, sp, Metrics
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
+from kivy.utils import platform
 
 
-# Use a 360 x 800 preview window on desktop only.
-# On Android, Kivy uses the device's full screen automatically.
-if platform not in ('android', 'ios'):
-    Window.size = (360, 800)
+# Desktop preview only. Android automatically uses the phone's screen size.
+Window.size = (360, 800)
+
+
+
+
+def light_haptic_feedback(*args):
+    """Very short Android vibration used as button press feedback."""
+    if platform != "android":
+        return
+    try:
+        from jnius import autoclass
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        Context = autoclass("android.content.Context")
+        Build_VERSION = autoclass("android.os.Build$VERSION")
+        VibrationEffect = autoclass("android.os.VibrationEffect")
+        vibrator = PythonActivity.mActivity.getSystemService(Context.VIBRATOR_SERVICE)
+        if Build_VERSION.SDK_INT >= 26:
+            # 10 ms at low amplitude: intentionally subtle.
+            vibrator.vibrate(VibrationEffect.createOneShot(10, 35))
+        else:
+            vibrator.vibrate(10)
+    except Exception:
+        pass
+
+
+def enable_haptics_for_buttons(root):
+    """Attach subtle haptic feedback to every Kivy Button in the widget tree."""
+    try:
+        from kivy.uix.button import Button
+        widgets = [root]
+        while widgets:
+            widget = widgets.pop()
+            if isinstance(widget, Button):
+                widget.bind(on_press=light_haptic_feedback)
+            widgets.extend(getattr(widget, "children", []))
+    except Exception:
+        pass
 
 
 class TextBox:
     """Small compatibility wrapper so the original Qt logic stays unchanged."""
 
     def __init__(self, value='', readonly=True, multiline=False, input_filter=None, font_size='13sp'):
+        # Keep the 360dp design exactly as tested, but automatically reduce
+        # text on narrower Android devices so changing values never clip.
+        if isinstance(font_size, str) and font_size.endswith('sp'):
+            self.base_font_sp = float(font_size[:-2])
+        else:
+            self.base_font_sp = float(font_size)
+
         self.widget = TextInput(
             text=str(value),
             readonly=readonly,
             multiline=multiline,
             input_filter=input_filter,
-            font_size=font_size,
+            font_size=sp(self.base_font_sp),
             padding=[dp(5), dp(6)],
             background_normal='',
             background_active='',
@@ -33,6 +74,16 @@ class TextBox:
             foreground_color=(1, 1, 1, 1),
             cursor_color=(1, 1, 1, 1),
         )
+        Window.bind(size=self._update_responsive_font)
+        self._update_responsive_font()
+
+    def _update_responsive_font(self, *_args):
+        density = Metrics.density or 1.0
+        logical_width_dp = Window.width / density
+        # 360dp and wider: original size. Below 360dp: scale down smoothly.
+        # Never go below 72% so values remain comfortably readable.
+        scale = min(1.0, max(0.72, logical_width_dp / 360.0))
+        self.widget.font_size = sp(self.base_font_sp * scale)
 
     def text(self):
         return self.widget.text
@@ -54,23 +105,14 @@ class TextBox:
 
 
 class ButtonBox:
-    NORMAL_COLOR = (0.20, 0.24, 0.30, 1)
-    PRESSED_COLOR = (0.36, 0.48, 0.64, 1)
-
     def __init__(self, text):
         self.widget = Button(
             text=text,
             font_size='14sp',
             background_normal='',
             background_down='',
-            background_color=self.NORMAL_COLOR,
+            background_color=(0.20, 0.24, 0.30, 1),
             color=(1, 1, 1, 1),
-        )
-        self.widget.bind(state=self._show_press_state)
-
-    def _show_press_state(self, button, state):
-        button.background_color = (
-            self.PRESSED_COLOR if state == 'down' else self.NORMAL_COLOR
         )
 
     def setEnabled(self, enabled):
@@ -259,9 +301,7 @@ class MyWidget(BoxLayout):
     def add_one_to_top_value_box(self):
         current_value = int(self.top_value_box.text())
         self.top_value_box.setText(str(current_value + 1))
-        # The original Qt app connected top_value_box.textChanged to this.
-        # Kivy needs the update called explicitly.
-        self.update_new_value_box()
+        self.update_true_count()
         
     def subtract_one(self):
         self.original_value -= 1
@@ -344,7 +384,6 @@ class MyWidget(BoxLayout):
         self.insure_textbox.clear()
         self.total_box.clear()
         self.decks_combo.setCurrentIndex(0)
-        self.update_new_value_box()
         self.reset_buttons()
 
     def reset_buttons(self):
@@ -1144,6 +1183,11 @@ class BlackjackApp(App):
     def build(self):
         Window.clearcolor = (0.06, 0.07, 0.09, 1)
         return MyWidget()
+
+
+
+    def on_start(self):
+        enable_haptics_for_buttons(self.root)
 
 
 if __name__ == '__main__':
