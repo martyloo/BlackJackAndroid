@@ -13,12 +13,12 @@ source.dir = .
 source.include_exts = py,png,jpg,jpeg,kv,atlas
 
 # User-visible version.
-version = 1.1.0
+version = 1.1.1
 
 # Android's internal version number.
 # Increase this for every future Play Store update:
 # 1, then 2, then 3, etc.
-android.numeric_version = 2
+android.numeric_version = 3
 
 # Python dependencies.
 requirements = python3,kivy
