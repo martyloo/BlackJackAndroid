@@ -22,7 +22,6 @@ android.numeric_version = 3
 
 # Python dependencies.
 requirements = python3,kivy
-android.permissions = VIBRATE
 
 # Phone display.
 orientation = portrait
@@ -46,7 +45,7 @@ android.accept_sdk_license = True
 android.release_artifact = aab
 
 # Your app currently does not need Android permissions.
-android.permissions =
+android.permissions = VIBRATE
 
 [buildozer]
 
