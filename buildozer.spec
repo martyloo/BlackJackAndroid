@@ -13,7 +13,7 @@ source.dir = .
 source.include_exts = py,png,jpg,jpeg,kv,atlas
 
 # User-visible version.
-version = 1.1.1
+version = 1.1.2
 
 # Android's internal version number.
 # Increase this for every future Play Store update:
