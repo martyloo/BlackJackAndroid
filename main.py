@@ -19,24 +19,32 @@ if platform != "android":
 
 
 def light_haptic_feedback(*args):
-    """Very short Android vibration used as button press feedback."""
+    """Use Android's native touch haptic feedback for button presses."""
     if platform != "android":
         return
     try:
         from jnius import autoclass
+
         PythonActivity = autoclass("org.kivy.android.PythonActivity")
-        Context = autoclass("android.content.Context")
-        Build_VERSION = autoclass("android.os.Build$VERSION")
-        VibrationEffect = autoclass("android.os.VibrationEffect")
-        vibrator = PythonActivity.mActivity.getSystemService(Context.VIBRATOR_SERVICE)
-        if Build_VERSION.SDK_INT >= 26:
-            # Short, crisp press feedback that remains subtle but is actually noticeable.
-            vibrator.vibrate(VibrationEffect.createOneShot(15, VibrationEffect.DEFAULT_AMPLITUDE))
-        else:
-            vibrator.vibrate(15)
+        HapticFeedbackConstants = autoclass("android.view.HapticFeedbackConstants")
+
+        activity = PythonActivity.mActivity
+        decor_view = activity.getWindow().getDecorView()
+
+        flags = HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+
+        success = decor_view.performHapticFeedback(
+            HapticFeedbackConstants.VIRTUAL_KEY,
+            flags
+        )
+
+        if not success:
+            decor_view.performHapticFeedback(
+                HapticFeedbackConstants.KEYBOARD_TAP,
+                flags
+            )
     except Exception:
         pass
-
 
 def enable_haptics_for_buttons(root):
     """Attach subtle haptic feedback to every Kivy Button in the widget tree."""
