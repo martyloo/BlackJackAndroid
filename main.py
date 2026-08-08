@@ -1,4 +1,5 @@
 from kivy.app import App
+from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.metrics import dp, sp, Metrics
 from kivy.uix.boxlayout import BoxLayout
@@ -19,7 +20,7 @@ if platform != "android":
 
 
 def light_haptic_feedback(*args):
-    """Short Android vibration pulse for button presses."""
+    """Android vibration pulse for a confirmed button press."""
     if platform != "android":
         return
     try:
@@ -33,17 +34,23 @@ def light_haptic_feedback(*args):
         activity = PythonActivity.mActivity
         vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE)
 
-        if vibrator is None:
+        if vibrator is None or not vibrator.hasVibrator():
             return
 
         if Build_VERSION.SDK_INT >= 26:
-            # Strong enough to feel, still very short.
-            effect = VibrationEffect.createOneShot(25, 90)
-            vibrator.vibrate(effect)
+            # Short but clearly noticeable tactile click.
+            vibrator.vibrate(
+                VibrationEffect.createOneShot(
+                    45,
+                    VibrationEffect.DEFAULT_AMPLITUDE
+                )
+            )
         else:
-            vibrator.vibrate(25)
-    except Exception:
-        pass
+            vibrator.vibrate(45)
+    except Exception as exc:
+        # Keep the calculator functional even if a particular handset
+        # rejects haptic access.
+        print("HAPTIC ERROR:", exc)
 
 def enable_haptics_for_buttons(root):
     """Attach subtle haptic feedback to every Kivy Button in the widget tree."""
@@ -62,23 +69,21 @@ def enable_haptics_for_buttons(root):
 
 
 def attach_button_feedback(button):
-    """Give a Kivy button real-button style press feedback."""
-    try:
-        normal = tuple(button.background_color)
-        pressed = tuple(min(1.0, c + 0.16) if i < 3 else c for i, c in enumerate(normal))
+    """Make every button visibly and physically react to a tap."""
+    normal = tuple(button.background_color)
+    pressed = (0.46, 0.62, 0.78, 1)
 
-        def _press(*args):
-            light_haptic_feedback()
-            button.background_color = pressed
+    def _restore(_dt):
+        button.background_color = normal
 
-        def _release(*args):
-            button.background_color = normal
+    def _press(*_args):
+        # Immediate strong visual feedback.
+        button.background_color = pressed
+        # Restore after a minimum visible interval so very quick taps still flash.
+        Clock.schedule_once(_restore, 0.12)
+        light_haptic_feedback()
 
-        button.bind(on_press=_press)
-        button.bind(on_release=_release)
-    except Exception:
-        # Fallback: still bind vibration even if styling cannot be changed.
-        button.bind(on_press=light_haptic_feedback)
+    button.bind(on_press=_press)
 
 class TextBox:
     """Small compatibility wrapper so the original Qt logic stays unchanged."""
