@@ -18,7 +18,7 @@ version = 1.1.1
 # Android's internal version number.
 # Increase this for every future Play Store update:
 # 1, then 2, then 3, etc.
-android.numeric_version = 3
+android.numeric_version = 4
 
 # Python dependencies.
 requirements = python3,kivy
