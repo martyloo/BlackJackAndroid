@@ -19,30 +19,29 @@ if platform != "android":
 
 
 def light_haptic_feedback(*args):
-    """Use Android's native touch haptic feedback for button presses."""
+    """Short Android vibration pulse for button presses."""
     if platform != "android":
         return
     try:
         from jnius import autoclass
 
         PythonActivity = autoclass("org.kivy.android.PythonActivity")
-        HapticFeedbackConstants = autoclass("android.view.HapticFeedbackConstants")
+        Context = autoclass("android.content.Context")
+        Build_VERSION = autoclass("android.os.Build$VERSION")
+        VibrationEffect = autoclass("android.os.VibrationEffect")
 
         activity = PythonActivity.mActivity
-        decor_view = activity.getWindow().getDecorView()
+        vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE)
 
-        flags = HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+        if vibrator is None:
+            return
 
-        success = decor_view.performHapticFeedback(
-            HapticFeedbackConstants.VIRTUAL_KEY,
-            flags
-        )
-
-        if not success:
-            decor_view.performHapticFeedback(
-                HapticFeedbackConstants.KEYBOARD_TAP,
-                flags
-            )
+        if Build_VERSION.SDK_INT >= 26:
+            # Strong enough to feel, still very short.
+            effect = VibrationEffect.createOneShot(25, 90)
+            vibrator.vibrate(effect)
+        else:
+            vibrator.vibrate(25)
     except Exception:
         pass
 
@@ -59,6 +58,27 @@ def enable_haptics_for_buttons(root):
     except Exception:
         pass
 
+
+
+
+def attach_button_feedback(button):
+    """Give a Kivy button real-button style press feedback."""
+    try:
+        normal = tuple(button.background_color)
+        pressed = tuple(min(1.0, c + 0.16) if i < 3 else c for i, c in enumerate(normal))
+
+        def _press(*args):
+            light_haptic_feedback()
+            button.background_color = pressed
+
+        def _release(*args):
+            button.background_color = normal
+
+        button.bind(on_press=_press)
+        button.bind(on_release=_release)
+    except Exception:
+        # Fallback: still bind vibration even if styling cannot be changed.
+        button.bind(on_press=light_haptic_feedback)
 
 class TextBox:
     """Small compatibility wrapper so the original Qt logic stays unchanged."""
@@ -124,7 +144,7 @@ class ButtonBox:
             background_color=(0.20, 0.24, 0.30, 1),
             color=(1, 1, 1, 1),
         )
-        self.widget.bind(on_press=light_haptic_feedback)
+        attach_button_feedback(self.widget)
 
     def setEnabled(self, enabled):
         self.widget.disabled = not enabled
