@@ -20,36 +20,14 @@ if platform != "android":
 
 
 def light_haptic_feedback(*args):
-    """Android vibration pulse for a confirmed button press."""
+    """Short tactile vibration on Android button presses."""
     if platform != "android":
         return
     try:
-        from jnius import autoclass
-
-        PythonActivity = autoclass("org.kivy.android.PythonActivity")
-        Context = autoclass("android.content.Context")
-        Build_VERSION = autoclass("android.os.Build$VERSION")
-        VibrationEffect = autoclass("android.os.VibrationEffect")
-
-        activity = PythonActivity.mActivity
-        vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE)
-
-        if vibrator is None or not vibrator.hasVibrator():
-            return
-
-        if Build_VERSION.SDK_INT >= 26:
-            # Short but clearly noticeable tactile click.
-            vibrator.vibrate(
-                VibrationEffect.createOneShot(
-                    45,
-                    VibrationEffect.DEFAULT_AMPLITUDE
-                )
-            )
-        else:
-            vibrator.vibrate(45)
+        from plyer import vibrator
+        # Plyer expects seconds. 0.06s is a short tactile click.
+        vibrator.vibrate(time=0.06)
     except Exception as exc:
-        # Keep the calculator functional even if a particular handset
-        # rejects haptic access.
         print("HAPTIC ERROR:", exc)
 
 def enable_haptics_for_buttons(root):
