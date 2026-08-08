@@ -20,13 +20,39 @@ if platform != "android":
 
 
 def light_haptic_feedback(*args):
-    """Short tactile vibration on Android button presses."""
+    """Android vibration pulse for button presses using VibratorManager on Android 12+."""
     if platform != "android":
         return
     try:
-        from plyer import vibrator
-        # Plyer expects seconds. 0.06s is a short tactile click.
-        vibrator.vibrate(time=0.06)
+        from jnius import autoclass
+
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        Context = autoclass("android.content.Context")
+        Build_VERSION = autoclass("android.os.Build$VERSION")
+        VibrationEffect = autoclass("android.os.VibrationEffect")
+
+        activity = PythonActivity.mActivity
+
+        if Build_VERSION.SDK_INT >= 31:
+            vibrator_manager = activity.getSystemService(Context.VIBRATOR_MANAGER_SERVICE)
+            vibrator = vibrator_manager.getDefaultVibrator()
+        else:
+            vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE)
+
+        if vibrator is None or not vibrator.hasVibrator():
+            print("HAPTIC: no vibrator available")
+            return
+
+        if Build_VERSION.SDK_INT >= 26:
+            effect = VibrationEffect.createOneShot(
+                90,
+                VibrationEffect.DEFAULT_AMPLITUDE
+            )
+            vibrator.vibrate(effect)
+        else:
+            vibrator.vibrate(90)
+
+        print("HAPTIC: vibration requested")
     except Exception as exc:
         print("HAPTIC ERROR:", exc)
 
