@@ -21,7 +21,8 @@ version = 1.1.1
 android.numeric_version = 3
 
 # Python dependencies.
-requirements = python3,kivy,plyer
+requirements = python3,kivy
+android.permissions = VIBRATE
 
 # Phone display.
 orientation = portrait
