@@ -13,7 +13,7 @@ from kivy.utils import platform
 
 # Use a 360x800 preview window only on desktop.
 # On Android, do NOT force Window.size — Android must provide the full device screen.
-if platform != "android":
+if platform not in ("android", "ios"):
     Window.size = (360, 800)
 
 
