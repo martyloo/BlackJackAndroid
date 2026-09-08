@@ -20,41 +20,58 @@ if platform not in ("android", "ios"):
 
 
 def light_haptic_feedback(*args):
-    """Android vibration pulse for button presses using VibratorManager on Android 12+."""
-    if platform != "android":
-        return
-    try:
-        from jnius import autoclass
+    """Light haptic feedback on Android and iOS."""
 
-        PythonActivity = autoclass("org.kivy.android.PythonActivity")
-        Context = autoclass("android.content.Context")
-        Build_VERSION = autoclass("android.os.Build$VERSION")
-        VibrationEffect = autoclass("android.os.VibrationEffect")
+    if platform == "android":
+        try:
+            from jnius import autoclass
 
-        activity = PythonActivity.mActivity
+            PythonActivity = autoclass("org.kivy.android.PythonActivity")
+            Context = autoclass("android.content.Context")
+            Build_VERSION = autoclass("android.os.Build$VERSION")
+            VibrationEffect = autoclass("android.os.VibrationEffect")
 
-        if Build_VERSION.SDK_INT >= 31:
-            vibrator_manager = activity.getSystemService(Context.VIBRATOR_MANAGER_SERVICE)
-            vibrator = vibrator_manager.getDefaultVibrator()
-        else:
-            vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE)
+            activity = PythonActivity.mActivity
 
-        if vibrator is None or not vibrator.hasVibrator():
-            print("HAPTIC: no vibrator available")
-            return
+            if Build_VERSION.SDK_INT >= 31:
+                vibrator_manager = activity.getSystemService(
+                    Context.VIBRATOR_MANAGER_SERVICE
+                )
+                vibrator = vibrator_manager.getDefaultVibrator()
+            else:
+                vibrator = activity.getSystemService(
+                    Context.VIBRATOR_SERVICE
+                )
 
-        if Build_VERSION.SDK_INT >= 26:
-            effect = VibrationEffect.createOneShot(
-                90,
-                VibrationEffect.DEFAULT_AMPLITUDE
+            if vibrator is None or not vibrator.hasVibrator():
+                return
+
+            if Build_VERSION.SDK_INT >= 26:
+                effect = VibrationEffect.createOneShot(
+                    20,
+                    VibrationEffect.DEFAULT_AMPLITUDE
+                )
+                vibrator.vibrate(effect)
+            else:
+                vibrator.vibrate(20)
+
+        except Exception:
+            pass
+
+    elif platform == "ios":
+        try:
+            from pyobjus import autoclass
+
+            UIImpactFeedbackGenerator = autoclass(
+                "UIImpactFeedbackGenerator"
             )
-            vibrator.vibrate(effect)
-        else:
-            vibrator.vibrate(90)
 
-        print("HAPTIC: vibration requested")
-    except Exception as exc:
-        print("HAPTIC ERROR:", exc)
+            generator = UIImpactFeedbackGenerator.alloc().initWithStyle_(0)
+            generator.prepare()
+            generator.impactOccurred()
+
+        except Exception:
+            pass
 
 def enable_haptics_for_buttons(root):
     """Attach subtle haptic feedback to every Kivy Button in the widget tree."""
