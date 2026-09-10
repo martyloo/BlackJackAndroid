@@ -27,7 +27,7 @@ android.archs = arm64-v8a
 android.accept_sdk_license = True
 
 # Google Play Billing
-android.gradle_dependencies = com.android.billingclient:billing:9.1.0
+android.gradle_dependencies = com.android.billingclient:billing:9.1.0,org.jetbrains.kotlin:kotlin-stdlib:1.8.22,org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22,org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22
 
 # Use current python-for-android development branch
 p4a.branch = develop
