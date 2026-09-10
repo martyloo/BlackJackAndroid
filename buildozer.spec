@@ -13,23 +13,21 @@ source.dir = .
 source.include_exts = py,png,jpg,jpeg,kv,atlas
 
 # User-visible version.
-version = 1.1.2
+version = 1.1.3
 
 # Android's internal version number.
-# Increase this for every future Play Store update:
-# 1, then 2, then 3, etc.
-android.numeric_version = 4
+# Must increase for every Play Store upload.
+android.numeric_version = 5
 
 # Python dependencies.
-requirements = python3,kivy
+requirements = python3,kivy,pyjnius
 
 # Phone display.
 orientation = portrait
 fullscreen = 1
 
-# Add these after creating the artwork.
+# Artwork.
 icon.filename = %(source.dir)s/icon.png
-# presplash.filename = %(source.dir)s/presplash.png
 
 # Android versions.
 android.api = 36
@@ -41,10 +39,13 @@ android.archs = arm64-v8a
 # Automatically accept Android SDK licences during GitHub Actions builds.
 android.accept_sdk_license = True
 
+# Google Play Billing Library
+android.gradle_dependencies = com.android.billingclient:billing:9.1.0
+
 # Produce the Google Play App Bundle.
 android.release_artifact = aab
 
-# Your app currently does not need Android permissions.
+# Permissions.
 android.permissions = VIBRATE
 
 [buildozer]
