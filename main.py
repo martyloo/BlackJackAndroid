@@ -215,78 +215,171 @@ class MyWidget(BoxLayout):
 
     @staticmethod
     def _label(text, size='12sp'):
-        return Label(text=text, font_size=size, color=(0.9, 0.92, 0.95, 1), halign='left', valign='middle')
+        label = Label(
+            text=text,
+            font_size=size,
+            color=(0.78, 0.82, 0.88, 1),
+            halign='left',
+            valign='middle'
+        )
+        label.bind(size=lambda widget, _value: setattr(widget, 'text_size', widget.size))
+        return label
+
+    @staticmethod
+    def _section_title(text):
+        label = Label(
+            text=text,
+            size_hint_y=None,
+            height=dp(19),
+            font_size='10sp',
+            bold=True,
+            color=(0.55, 0.72, 0.92, 1),
+            halign='left',
+            valign='middle'
+        )
+        label.bind(size=lambda widget, _value: setattr(widget, 'text_size', widget.size))
+        return label
 
     def _field_pair(self, parent, label, box):
-        holder = BoxLayout(orientation='vertical', spacing=dp(1))
-        holder.add_widget(self._label(label, '11sp'))
+        holder = BoxLayout(orientation='vertical', spacing=dp(2))
+        holder.add_widget(self._label(label, '10sp'))
         holder.add_widget(box.widget)
         parent.add_widget(holder)
 
+    def _update_strategy_style(self, *_args):
+        """Make the recommendation instantly readable without changing strategy logic."""
+        if not hasattr(self, 'strategy_textbox'):
+            return
+
+        value = self.strategy_textbox.text().strip().upper()
+        widget = self.strategy_textbox.widget
+
+        # Neutral/default
+        widget.background_color = (0.11, 0.13, 0.17, 1)
+        widget.foreground_color = (1, 1, 1, 1)
+
+        # Colours are deliberately high-contrast and only affect presentation.
+        if value.startswith('STAND'):
+            widget.background_color = (0.10, 0.38, 0.22, 1)
+        elif value.startswith('HIT'):
+            widget.background_color = (0.08, 0.30, 0.52, 1)
+        elif value.startswith('DD') or '/DD' in value:
+            widget.background_color = (0.56, 0.31, 0.05, 1)
+        elif value.startswith('SPLIT') or '/SPLIT' in value:
+            widget.background_color = (0.38, 0.16, 0.52, 1)
+        elif 'SURR' in value:
+            widget.background_color = (0.48, 0.12, 0.13, 1)
+
     def initUI(self):
+        # Header
         title = Label(
             text='BLACKJACK CALCULATOR',
             size_hint_y=None,
-            height=dp(30),
-            font_size='18sp',
+            height=dp(32),
+            font_size='20sp',
             bold=True,
             color=(1, 1, 1, 1),
         )
         self.add_widget(title)
 
-        self.top_value_box = TextBox('0', font_size='11sp')
-        self.new_value_box = TextBox('0', font_size='11sp')
-        self.decks_left_box = TextBox('0', font_size='11sp')
-        self.value_box = TextBox('0', font_size='11sp')
-        self.true_count_box = TextBox('0', font_size='11sp')
+        subtitle = Label(
+            text='CARD COUNT  •  BET SIZE  •  PLAY DECISION',
+            size_hint_y=None,
+            height=dp(17),
+            font_size='9sp',
+            color=(0.55, 0.63, 0.72, 1),
+        )
+        self.add_widget(subtitle)
+
+        # ---------- COUNT ----------
+        self.add_widget(self._section_title('COUNT'))
+
+        self.top_value_box = TextBox('0', font_size='12sp')
+        self.new_value_box = TextBox('0', font_size='12sp')
+        self.decks_left_box = TextBox('0', font_size='12sp')
+        self.value_box = TextBox('0', font_size='12sp')
+        self.true_count_box = TextBox('0', font_size='12sp')
         self.decks_combo = ComboBox(['1', '2', '3', '4', '5', '6', '7', '8'])
         self.decks_combo.currentIndexChanged_connect(self.select_decks)
         self.top_value_box.on_change(self.update_new_value_box)
 
-        metrics = GridLayout(cols=3, spacing=dp(4), size_hint_y=None, height=dp(108))
+        metrics = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(92))
         self._field_pair(metrics, 'Cards dealt', self.top_value_box)
         self._field_pair(metrics, 'Cards left', self.new_value_box)
         self._field_pair(metrics, 'Decks left', self.decks_left_box)
         self._field_pair(metrics, 'Running count', self.value_box)
-        self._field_pair(metrics, 'True count', self.true_count_box)
-        deck_holder = BoxLayout(orientation='vertical', spacing=dp(1))
-        deck_holder.add_widget(self._label('No. of decks', '11sp'))
+        self._field_pair(metrics, 'TRUE COUNT', self.true_count_box)
+
+        deck_holder = BoxLayout(orientation='vertical', spacing=dp(2))
+        deck_holder.add_widget(self._label('Decks', '10sp'))
         deck_holder.add_widget(self.decks_combo.widget)
         metrics.add_widget(deck_holder)
         self.add_widget(metrics)
 
-        self.addButton = ButtonBox('2, 3, 4, 5, 6   (+1)')
-        self.sevenEightNineButton = ButtonBox('7, 8, 9   (0)')
-        self.subtractButton = ButtonBox('10, J, Q, K, A   (-1)')
-        for wrapper in (self.addButton, self.sevenEightNineButton, self.subtractButton):
-            wrapper.widget.size_hint_y = None
-            wrapper.widget.height = dp(38)
-            self.add_widget(wrapper.widget)
-        self.addButton.widget.bind(on_release=lambda *_: (self.add_one(), self.add_one_to_top_value_box()))
-        self.sevenEightNineButton.widget.bind(on_release=lambda *_: (self.add_seven_eight_nine(), self.add_one_to_top_value_box()))
-        self.subtractButton.widget.bind(on_release=lambda *_: (self.subtract_one(), self.add_one_to_top_value_box()))
+        # Make True Count slightly more prominent.
+        self.true_count_box.widget.background_color = (0.12, 0.25, 0.39, 1)
+        self.true_count_box.widget.foreground_color = (1, 1, 1, 1)
 
-        self.min_bet_box = TextBox('', readonly=False, input_filter='float', font_size='11sp')
-        self.stake_required_box = TextBox('0', font_size='11sp')
-        self.bet_amount_box = TextBox('0', font_size='11sp')
+        # ---------- COUNT CARD ----------
+        self.add_widget(self._section_title('CARD COUNT INPUT'))
+
+        count_buttons = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(42))
+        self.addButton = ButtonBox('2–6\n+1')
+        self.sevenEightNineButton = ButtonBox('7–9\n0')
+        self.subtractButton = ButtonBox('10–A\n−1')
+
+        # Different tones make the three count groups easier to identify.
+        self.addButton.widget.background_color = (0.12, 0.40, 0.25, 1)
+        self.sevenEightNineButton.widget.background_color = (0.25, 0.29, 0.35, 1)
+        self.subtractButton.widget.background_color = (0.46, 0.16, 0.18, 1)
+
+        for wrapper in (self.addButton, self.sevenEightNineButton, self.subtractButton):
+            wrapper.widget.font_size = '13sp'
+            count_buttons.add_widget(wrapper.widget)
+
+        self.add_widget(count_buttons)
+
+        self.addButton.widget.bind(
+            on_release=lambda *_: (self.add_one(), self.add_one_to_top_value_box())
+        )
+        self.sevenEightNineButton.widget.bind(
+            on_release=lambda *_: (self.add_seven_eight_nine(), self.add_one_to_top_value_box())
+        )
+        self.subtractButton.widget.bind(
+            on_release=lambda *_: (self.subtract_one(), self.add_one_to_top_value_box())
+        )
+
+        # ---------- BET ----------
+        self.add_widget(self._section_title('BET'))
+
+        self.min_bet_box = TextBox('', readonly=False, input_filter='float', font_size='12sp')
+        self.stake_required_box = TextBox('0', font_size='12sp')
+        self.bet_amount_box = TextBox('0', font_size='12sp')
         self.min_bet_box.on_change(self.update_stake_required)
-        bets = GridLayout(cols=3, spacing=dp(4), size_hint_y=None, height=dp(54))
+
+        bets = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(47))
         self._field_pair(bets, 'Minimum bet', self.min_bet_box)
-        self._field_pair(bets, 'Stake', self.stake_required_box)
-        self._field_pair(bets, 'Suggested bet', self.bet_amount_box)
+        self._field_pair(bets, '100-unit bank', self.stake_required_box)
+        self._field_pair(bets, 'SUGGESTED BET', self.bet_amount_box)
         self.add_widget(bets)
+        self.bet_amount_box.widget.background_color = (0.13, 0.24, 0.19, 1)
+
+        # ---------- HAND ----------
+        self.add_widget(self._section_title('PLAY YOUR HAND  •  TAP DEALER CARD FIRST'))
 
         card_names = ['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King']
-        card_grid = GridLayout(cols=4, spacing=dp(4), size_hint_y=None, height=dp(150))
+        card_grid = GridLayout(cols=7, spacing=dp(4), size_hint_y=None, height=dp(78))
         wrappers = {}
+
+        # Two compact rows give the hand section more room for the decision panel.
         for name in card_names:
             wrapper = ButtonBox(name)
+            wrapper.widget.font_size = '12sp'
             wrappers[name] = wrapper
             wrapper.widget.bind(on_release=lambda _button, w=wrapper: self._card_pressed(w))
             card_grid.add_widget(wrapper.widget)
-        blank = Label(text='')
-        card_grid.add_widget(blank)
-        card_grid.add_widget(Label(text=''))
+
+        # Fill the final grid slot.
         card_grid.add_widget(Label(text=''))
         self.add_widget(card_grid)
 
@@ -305,36 +398,62 @@ class MyWidget(BoxLayout):
         self.kingButton = wrappers['King']
         self.button_to_label = {wrapper: name for name, wrapper in wrappers.items()}
 
-        self.insure_textbox = TextBox('')
-        self.card_label = TextBox('')
-        dealer_row = GridLayout(cols=2, spacing=dp(4), size_hint_y=None, height=dp(53))
-        self._field_pair(dealer_row, 'Insurance', self.insure_textbox)
+        self.insure_textbox = TextBox('', font_size='12sp')
+        self.card_label = TextBox('', font_size='12sp')
+        dealer_row = GridLayout(cols=2, spacing=dp(5), size_hint_y=None, height=dp(47))
         self._field_pair(dealer_row, "Dealer's card", self.card_label)
+        self._field_pair(dealer_row, 'Insurance', self.insure_textbox)
         self.add_widget(dealer_row)
 
-        self.your_cards_textbox1 = TextBox('')
-        self.your_cards_textbox2 = TextBox('')
-        self.your_cards_textbox3 = TextBox('')
-        self.your_cards_textbox4 = TextBox('')
-        self.your_cards_textbox5 = TextBox('')
-        cards_row = GridLayout(cols=5, spacing=dp(3), size_hint_y=None, height=dp(50))
+        self.your_cards_textbox1 = TextBox('', font_size='11sp')
+        self.your_cards_textbox2 = TextBox('', font_size='11sp')
+        self.your_cards_textbox3 = TextBox('', font_size='11sp')
+        self.your_cards_textbox4 = TextBox('', font_size='11sp')
+        self.your_cards_textbox5 = TextBox('', font_size='11sp')
+
+        cards_row = GridLayout(cols=5, spacing=dp(4), size_hint_y=None, height=dp(44))
         for index, box in enumerate([
             self.your_cards_textbox1, self.your_cards_textbox2,
             self.your_cards_textbox3, self.your_cards_textbox4,
             self.your_cards_textbox5,
         ], start=1):
-            self._field_pair(cards_row, str(index), box)
+            self._field_pair(cards_row, f'Card {index}', box)
         self.add_widget(cards_row)
 
-        self.strategy_textbox = TextBox('')
-        self.total_box = TextBox('', font_size='12sp')
-        result_row = GridLayout(cols=2, spacing=dp(4), size_hint_y=None, height=dp(55))
-        self._field_pair(result_row, 'Strategy', self.strategy_textbox)
-        self._field_pair(result_row, 'Total', self.total_box)
+        # ---------- DECISION ----------
+        self.add_widget(self._section_title('RECOMMENDED PLAY'))
+
+        self.strategy_textbox = TextBox('', font_size='24sp')
+        self.total_box = TextBox('', font_size='18sp')
+
+        # Large central recommendation; the existing strategy code still writes
+        # to self.strategy_textbox exactly as before.
+        result_row = BoxLayout(orientation='horizontal', spacing=dp(5), size_hint_y=None, height=dp(64))
+
+        strategy_holder = BoxLayout(orientation='vertical', spacing=dp(2))
+        strategy_holder.add_widget(self._label('ACTION', '10sp'))
+        strategy_holder.add_widget(self.strategy_textbox.widget)
+
+        total_holder = BoxLayout(orientation='vertical', spacing=dp(2))
+        total_holder.add_widget(self._label('TOTAL', '10sp'))
+        total_holder.add_widget(self.total_box.widget)
+
+        # Give ACTION more visual weight than TOTAL.
+        strategy_holder.size_hint_x = 0.72
+        total_holder.size_hint_x = 0.28
+        result_row.add_widget(strategy_holder)
+        result_row.add_widget(total_holder)
         self.add_widget(result_row)
 
+        self.strategy_textbox.widget.bind(text=self._update_strategy_style)
+        self._update_strategy_style()
+
+        # ---------- CONTROLS ----------
         self.refreshButton = ButtonBox('NEW HAND')
-        self.refreshAllButton = ButtonBox('RESET ALL')
+        self.refreshAllButton = ButtonBox('RESET SHOE')
+        self.refreshButton.widget.background_color = (0.14, 0.32, 0.48, 1)
+        self.refreshAllButton.widget.background_color = (0.30, 0.32, 0.36, 1)
+
         refresh_row = GridLayout(cols=2, spacing=dp(5), size_hint_y=None, height=dp(42))
         refresh_row.add_widget(self.refreshButton.widget)
         refresh_row.add_widget(self.refreshAllButton.widget)
@@ -1236,15 +1355,542 @@ class MyWidget(BoxLayout):
                 return
 
 
+
+# ---------------------------------------------------------------------------
+# GOOGLE PLAY BILLING
+# ---------------------------------------------------------------------------
+# IMPORTANT:
+# - Create this subscription product in Play Console with product ID:
+#       blackjack_premium
+# - Set its auto-renewing base plan to £19.99 / month in Play Console.
+# - Add a 3-day free-trial offer in Play Console.
+# - Do NOT hard-code the £19.99 price or trial duration here. Google Play
+#   returns the eligible offer and handles trial -> paid renewal automatically.
+#
+# This client-side entitlement check is suitable for getting the app working,
+# but for stronger anti-tamper protection Google recommends verifying purchase
+# tokens on your own backend as well.
+# ---------------------------------------------------------------------------
+
+GOOGLE_PLAY_SUBSCRIPTION_ID = "blackjack_premium"
+
+
+class SubscriptionGate(BoxLayout):
+    """Shown while Google Play checks entitlement, or when a subscription is required."""
+
+    def __init__(self, app, **kwargs):
+        super().__init__(
+            orientation="vertical",
+            spacing=dp(14),
+            padding=dp(24),
+            **kwargs
+        )
+        self.app = app
+
+        self.add_widget(Label(
+            text="BLACKJACK CALCULATOR",
+            font_size="22sp",
+            bold=True,
+            size_hint_y=None,
+            height=dp(55),
+        ))
+
+        self.status = Label(
+            text="Checking your Google Play subscription...",
+            font_size="15sp",
+            halign="center",
+            valign="middle",
+        )
+        self.status.bind(size=lambda widget, _value: setattr(widget, "text_size", widget.size))
+        self.add_widget(self.status)
+
+        self.subscribe_button = Button(
+            text="START 3-DAY FREE TRIAL",
+            size_hint_y=None,
+            height=dp(54),
+            disabled=True,
+        )
+        attach_button_feedback(self.subscribe_button)
+        self.subscribe_button.bind(on_release=lambda *_: self.app.billing.start_purchase())
+        self.add_widget(self.subscribe_button)
+
+        self.restore_button = Button(
+            text="RESTORE / CHECK SUBSCRIPTION",
+            size_hint_y=None,
+            height=dp(48),
+            disabled=True,
+        )
+        attach_button_feedback(self.restore_button)
+        self.restore_button.bind(on_release=lambda *_: self.app.billing.check_entitlement())
+        self.add_widget(self.restore_button)
+
+        self.price_info = Label(
+            text="3 days free, then £19.99 per month. Auto-renews until cancelled.",
+            font_size="12sp",
+            halign="center",
+            valign="middle",
+            size_hint_y=None,
+            height=dp(55),
+        )
+        self.price_info.bind(size=lambda widget, _value: setattr(widget, "text_size", widget.size))
+        self.add_widget(self.price_info)
+
+    def set_ready(self):
+        self.subscribe_button.disabled = False
+        self.restore_button.disabled = False
+
+    def set_status(self, message):
+        self.status.text = message
+
+
+if platform == "android":
+    from jnius import autoclass, PythonJavaClass, java_method
+
+    PythonActivity = autoclass("org.kivy.android.PythonActivity")
+    BillingClient = autoclass("com.android.billingclient.api.BillingClient")
+    QueryProductDetailsParams = autoclass(
+        "com.android.billingclient.api.QueryProductDetailsParams"
+    )
+    QueryProductDetailsProduct = autoclass(
+        "com.android.billingclient.api.QueryProductDetailsParams$Product"
+    )
+    QueryPurchasesParams = autoclass(
+        "com.android.billingclient.api.QueryPurchasesParams"
+    )
+    BillingFlowParams = autoclass("com.android.billingclient.api.BillingFlowParams")
+    BillingFlowProductDetailsParams = autoclass(
+        "com.android.billingclient.api.BillingFlowParams$ProductDetailsParams"
+    )
+    AcknowledgePurchaseParams = autoclass(
+        "com.android.billingclient.api.AcknowledgePurchaseParams"
+    )
+    PendingPurchasesParams = autoclass(
+        "com.android.billingclient.api.PendingPurchasesParams"
+    )
+    Purchase = autoclass("com.android.billingclient.api.Purchase")
+    PurchaseState = autoclass("com.android.billingclient.api.Purchase$PurchaseState")
+
+
+    class _PurchasesUpdatedListener(PythonJavaClass):
+        __javainterfaces__ = [
+            "com/android/billingclient/api/PurchasesUpdatedListener"
+        ]
+        __javacontext__ = "app"
+
+        def __init__(self, owner):
+            super().__init__()
+            self.owner = owner
+
+        @java_method(
+            "(Lcom/android/billingclient/api/BillingResult;Ljava/util/List;)V"
+        )
+        def onPurchasesUpdated(self, billing_result, purchases):
+            self.owner._on_purchases_updated(billing_result, purchases)
+
+
+    class _BillingClientStateListener(PythonJavaClass):
+        __javainterfaces__ = [
+            "com/android/billingclient/api/BillingClientStateListener"
+        ]
+        __javacontext__ = "app"
+
+        def __init__(self, owner):
+            super().__init__()
+            self.owner = owner
+
+        @java_method("(Lcom/android/billingclient/api/BillingResult;)V")
+        def onBillingSetupFinished(self, billing_result):
+            self.owner._on_billing_setup_finished(billing_result)
+
+        @java_method("()V")
+        def onBillingServiceDisconnected(self):
+            self.owner._on_billing_disconnected()
+
+
+    class _ProductDetailsResponseListener(PythonJavaClass):
+        __javainterfaces__ = [
+            "com/android/billingclient/api/ProductDetailsResponseListener"
+        ]
+        __javacontext__ = "app"
+
+        def __init__(self, owner):
+            super().__init__()
+            self.owner = owner
+
+        @java_method(
+            "(Lcom/android/billingclient/api/BillingResult;"
+            "Lcom/android/billingclient/api/QueryProductDetailsResult;)V"
+        )
+        def onProductDetailsResponse(self, billing_result, query_result):
+            self.owner._on_product_details_response(billing_result, query_result)
+
+
+    class _PurchasesResponseListener(PythonJavaClass):
+        __javainterfaces__ = [
+            "com/android/billingclient/api/PurchasesResponseListener"
+        ]
+        __javacontext__ = "app"
+
+        def __init__(self, owner):
+            super().__init__()
+            self.owner = owner
+
+        @java_method(
+            "(Lcom/android/billingclient/api/BillingResult;Ljava/util/List;)V"
+        )
+        def onQueryPurchasesResponse(self, billing_result, purchases):
+            self.owner._on_query_purchases_response(billing_result, purchases)
+
+
+    class _AcknowledgePurchaseResponseListener(PythonJavaClass):
+        __javainterfaces__ = [
+            "com/android/billingclient/api/AcknowledgePurchaseResponseListener"
+        ]
+        __javacontext__ = "app"
+
+        def __init__(self, owner):
+            super().__init__()
+            self.owner = owner
+
+        @java_method("(Lcom/android/billingclient/api/BillingResult;)V")
+        def onAcknowledgePurchaseResponse(self, billing_result):
+            self.owner._on_acknowledge_response(billing_result)
+
+
+class GooglePlayBilling:
+    """Small Google Play Billing wrapper for the one monthly subscription."""
+
+    def __init__(self, app):
+        self.app = app
+        self.client = None
+        self.product_details = None
+
+        # Keep listener objects alive for the lifetime of BillingClient.
+        self.purchases_updated_listener = None
+        self.connection_listener = None
+        self.product_details_listener = None
+        self.purchases_response_listener = None
+        self.ack_listener = None
+
+    def start(self):
+        if platform != "android":
+            # Desktop is used as a development preview only.
+            Clock.schedule_once(lambda _dt: self.app.set_entitled(True), 0)
+            return
+
+        try:
+            self.purchases_updated_listener = _PurchasesUpdatedListener(self)
+            self.connection_listener = _BillingClientStateListener(self)
+            self.product_details_listener = _ProductDetailsResponseListener(self)
+            self.purchases_response_listener = _PurchasesResponseListener(self)
+            self.ack_listener = _AcknowledgePurchaseResponseListener(self)
+
+            pending_params = (
+                PendingPurchasesParams.newBuilder()
+                .enableOneTimeProducts()
+                .build()
+            )
+
+            self.client = (
+                BillingClient.newBuilder(PythonActivity.mActivity)
+                .setListener(self.purchases_updated_listener)
+                .enablePendingPurchases(pending_params)
+                .build()
+            )
+            self.client.startConnection(self.connection_listener)
+
+        except Exception as exc:
+            self._ui_status("Google Play Billing could not start: " + str(exc))
+
+    def _on_billing_setup_finished(self, billing_result):
+        if billing_result.getResponseCode() == BillingClient.BillingResponseCode.OK:
+            self._ui_ready()
+            self.query_product_details()
+            self.check_entitlement()
+        else:
+            self._ui_status(
+                "Google Play Billing error: " + billing_result.getDebugMessage()
+            )
+
+    def _on_billing_disconnected(self):
+        self._ui_status("Google Play connection lost. Tap Restore to try again.")
+
+    def query_product_details(self):
+        if not self.client or not self.client.isReady():
+            return
+
+        try:
+            product = (
+                QueryProductDetailsProduct.newBuilder()
+                .setProductId(GOOGLE_PLAY_SUBSCRIPTION_ID)
+                .setProductType(BillingClient.ProductType.SUBS)
+                .build()
+            )
+
+            products = autoclass("java.util.ArrayList")()
+            products.add(product)
+
+            params = (
+                QueryProductDetailsParams.newBuilder()
+                .setProductList(products)
+                .build()
+            )
+
+            self.client.queryProductDetailsAsync(
+                params,
+                self.product_details_listener
+            )
+        except Exception as exc:
+            self._ui_status("Could not load subscription: " + str(exc))
+
+    def _on_product_details_response(self, billing_result, query_result):
+        if billing_result.getResponseCode() != BillingClient.BillingResponseCode.OK:
+            self._ui_status(
+                "Could not load subscription: " + billing_result.getDebugMessage()
+            )
+            return
+
+        details_list = query_result.getProductDetailsList()
+        if details_list is None or details_list.size() == 0:
+            self._ui_status(
+                "Subscription not found. Check that blackjack_premium is active in Play Console."
+            )
+            return
+
+        self.product_details = details_list.get(0)
+        self._ui_status("Subscription ready.")
+
+    def start_purchase(self):
+        """Launch Google's subscription purchase sheet."""
+        if platform != "android":
+            return
+
+        if not self.client or not self.client.isReady():
+            self._ui_status("Connecting to Google Play...")
+            self.start()
+            return
+
+        if self.product_details is None:
+            self._ui_status("Loading subscription...")
+            self.query_product_details()
+            return
+
+        try:
+            offers = self.product_details.getSubscriptionOfferDetails()
+            if offers is None or offers.size() == 0:
+                self._ui_status(
+                    "No eligible subscription offer is available for this Google account."
+                )
+                return
+
+            # Prefer an eligible offer whose first pricing phase is free.
+            # If the account is no longer trial-eligible, fall back to the first
+            # eligible offer/base-plan offer returned by Google Play.
+            selected_offer = None
+
+            for index in range(offers.size()):
+                offer = offers.get(index)
+                phases = offer.getPricingPhases().getPricingPhaseList()
+
+                if phases is not None and phases.size() > 0:
+                    first_phase = phases.get(0)
+                    if first_phase.getPriceAmountMicros() == 0:
+                        selected_offer = offer
+                        break
+
+            if selected_offer is None:
+                selected_offer = offers.get(0)
+
+            product_params = (
+                BillingFlowProductDetailsParams.newBuilder()
+                .setProductDetails(self.product_details)
+                .setOfferToken(selected_offer.getOfferToken())
+                .build()
+            )
+
+            params_list = autoclass("java.util.ArrayList")()
+            params_list.add(product_params)
+
+            flow_params = (
+                BillingFlowParams.newBuilder()
+                .setProductDetailsParamsList(params_list)
+                .build()
+            )
+
+            result = self.client.launchBillingFlow(
+                PythonActivity.mActivity,
+                flow_params
+            )
+
+            if result.getResponseCode() != BillingClient.BillingResponseCode.OK:
+                self._ui_status(
+                    "Could not start purchase: " + result.getDebugMessage()
+                )
+
+        except Exception as exc:
+            self._ui_status("Could not start purchase: " + str(exc))
+
+    def _on_purchases_updated(self, billing_result, purchases):
+        code = billing_result.getResponseCode()
+
+        if code == BillingClient.BillingResponseCode.OK and purchases is not None:
+            self._process_purchase_list(purchases)
+        elif code == BillingClient.BillingResponseCode.USER_CANCELED:
+            self._ui_status("Purchase cancelled.")
+        else:
+            self._ui_status(
+                "Purchase error: " + billing_result.getDebugMessage()
+            )
+
+    def check_entitlement(self):
+        """Restore/check active subscriptions every time the app starts."""
+        if platform != "android":
+            self.app.set_entitled(True)
+            return
+
+        if not self.client or not self.client.isReady():
+            self._ui_status("Connecting to Google Play...")
+            if self.client is None:
+                self.start()
+            return
+
+        try:
+            params = (
+                QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.SUBS)
+                .build()
+            )
+            self.client.queryPurchasesAsync(
+                params,
+                self.purchases_response_listener
+            )
+        except Exception as exc:
+            self._ui_status("Could not check subscription: " + str(exc))
+
+    def _on_query_purchases_response(self, billing_result, purchases):
+        if billing_result.getResponseCode() != BillingClient.BillingResponseCode.OK:
+            self._ui_status(
+                "Could not check subscription: " + billing_result.getDebugMessage()
+            )
+            return
+
+        self._process_purchase_list(purchases)
+
+    def _process_purchase_list(self, purchases):
+        entitled = False
+        pending = False
+
+        if purchases is not None:
+            for index in range(purchases.size()):
+                purchase = purchases.get(index)
+                products = purchase.getProducts()
+
+                owns_our_subscription = False
+                if products is not None:
+                    for p_index in range(products.size()):
+                        if str(products.get(p_index)) == GOOGLE_PLAY_SUBSCRIPTION_ID:
+                            owns_our_subscription = True
+                            break
+
+                if not owns_our_subscription:
+                    continue
+
+                state = purchase.getPurchaseState()
+
+                if state == PurchaseState.PURCHASED:
+                    entitled = True
+
+                    # A new subscription purchase must be acknowledged.
+                    if not purchase.isAcknowledged():
+                        self._acknowledge(purchase.getPurchaseToken())
+
+                elif state == PurchaseState.PENDING:
+                    pending = True
+
+        if entitled:
+            self._ui_status("Subscription active.")
+            Clock.schedule_once(lambda _dt: self.app.set_entitled(True), 0)
+        else:
+            Clock.schedule_once(lambda _dt: self.app.set_entitled(False), 0)
+            if pending:
+                self._ui_status("Your Google Play purchase is pending.")
+            else:
+                self._ui_status("A subscription is required to use the calculator.")
+
+    def _acknowledge(self, purchase_token):
+        try:
+            params = (
+                AcknowledgePurchaseParams.newBuilder()
+                .setPurchaseToken(purchase_token)
+                .build()
+            )
+            self.client.acknowledgePurchase(params, self.ack_listener)
+        except Exception as exc:
+            self._ui_status("Purchase acknowledgement error: " + str(exc))
+
+    def _on_acknowledge_response(self, billing_result):
+        if billing_result.getResponseCode() != BillingClient.BillingResponseCode.OK:
+            self._ui_status(
+                "Subscription active, but acknowledgement failed: "
+                + billing_result.getDebugMessage()
+            )
+
+    def _ui_ready(self):
+        Clock.schedule_once(
+            lambda _dt: self.app.subscription_gate.set_ready()
+            if self.app.subscription_gate else None,
+            0
+        )
+
+    def _ui_status(self, message):
+        Clock.schedule_once(
+            lambda _dt: self.app.subscription_gate.set_status(message)
+            if self.app.subscription_gate else None,
+            0
+        )
+
+    def end(self):
+        if platform == "android" and self.client is not None:
+            try:
+                self.client.endConnection()
+            except Exception:
+                pass
+
+
 class BlackjackApp(App):
     title = 'Blackjack Calculator'
 
     def build(self):
         Window.clearcolor = (0.06, 0.07, 0.09, 1)
+
+        self.subscription_gate = SubscriptionGate(self)
+        self.billing = GooglePlayBilling(self)
+
+        if platform == "android":
+            Clock.schedule_once(lambda _dt: self.billing.start(), 0.25)
+            return self.subscription_gate
+
+        # Keep desktop development/testing convenient.
         return MyWidget()
 
+    def set_entitled(self, entitled):
+        """Switch between the paywall and the actual calculator."""
+        if entitled:
+            if not isinstance(self.root, MyWidget):
+                self.root_window.remove_widget(self.root)
+                self.root = MyWidget()
+                self.root_window.add_widget(self.root)
+        else:
+            if not isinstance(self.root, SubscriptionGate):
+                self.subscription_gate = SubscriptionGate(self)
+                self.subscription_gate.set_ready()
+                self.root_window.remove_widget(self.root)
+                self.root = self.subscription_gate
+                self.root_window.add_widget(self.root)
 
-
+    def on_stop(self):
+        if hasattr(self, "billing"):
+            self.billing.end()
 
 
 if __name__ == '__main__':
