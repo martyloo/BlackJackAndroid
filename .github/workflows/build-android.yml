@@ -44,15 +44,18 @@ jobs:
           test -s blackjack-upload-key.jks
           ls -lh blackjack-upload-key.jks
 
-      - name: Cache Android build files
+      - name: Cache Android downloads
         uses: actions/cache@v4
         with:
           path: |
             ~/.buildozer
-            .buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-global-${{ runner.os }}
           restore-keys: |
-            buildozer-${{ runner.os }}-
+            buildozer-global-${{ runner.os }}-
+
+      - name: Clean previous project build
+        run: |
+          rm -rf .buildozer
 
       - name: Build signed Android App Bundle
         env:
