@@ -20,7 +20,7 @@ version = 1.1.3
 android.numeric_version = 5
 
 # Python dependencies.
-requirements = python3,kivy,pyjnius
+requirements = python3,kivy,pyjnius,charset-normalizer==2.1.1
 
 # Phone display.
 orientation = portrait
