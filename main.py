@@ -1709,7 +1709,7 @@ class GooglePlayBilling:
             code = billing_result.getResponseCode()
             message = str(billing_result.getDebugMessage())
 
-            if code == BillingClient.BillingResponseCode.OK:
+            if code == 0:
                 self._after_connected()
             else:
                 self._cancel_connection_watchers()
@@ -1745,7 +1745,7 @@ class GooglePlayBilling:
             product = (
                 QueryProductDetailsProduct.newBuilder()
                 .setProductId(GOOGLE_PLAY_SUBSCRIPTION_ID)
-                .setProductType(BillingClient.ProductType.SUBS)
+                .setProductType("subs")
                 .build()
             )
 
@@ -1774,7 +1774,7 @@ class GooglePlayBilling:
     def _on_product_details_response(self, billing_result, query_result):
         try:
             code = billing_result.getResponseCode()
-            if code != BillingClient.BillingResponseCode.OK:
+            if code != 0:
                 self._ui_status(
                     "Could not load subscription "
                     + str(code)
@@ -1868,7 +1868,7 @@ class GooglePlayBilling:
                 flow_params
             )
 
-            if result.getResponseCode() != BillingClient.BillingResponseCode.OK:
+            if result.getResponseCode() != 0:
                 self._ui_status(
                     "Could not start purchase "
                     + str(result.getResponseCode())
@@ -1888,9 +1888,9 @@ class GooglePlayBilling:
         try:
             code = billing_result.getResponseCode()
 
-            if code == BillingClient.BillingResponseCode.OK and purchases is not None:
+            if code == 0 and purchases is not None:
                 self._process_purchase_list(purchases)
-            elif code == BillingClient.BillingResponseCode.USER_CANCELED:
+            elif code == 1:
                 self._ui_status("Purchase cancelled.")
             else:
                 self._ui_status(
@@ -1920,7 +1920,7 @@ class GooglePlayBilling:
         try:
             params = (
                 QueryPurchasesParams.newBuilder()
-                .setProductType(BillingClient.ProductType.SUBS)
+                .setProductType("subs")
                 .build()
             )
 
@@ -1939,7 +1939,7 @@ class GooglePlayBilling:
 
     def _on_query_purchases_response(self, billing_result, purchases):
         try:
-            if billing_result.getResponseCode() != BillingClient.BillingResponseCode.OK:
+            if billing_result.getResponseCode() != 0:
                 self._ui_status(
                     "Could not check subscription "
                     + str(billing_result.getResponseCode())
@@ -2021,7 +2021,7 @@ class GooglePlayBilling:
             )
 
     def _on_acknowledge_response(self, billing_result):
-        if billing_result.getResponseCode() != BillingClient.BillingResponseCode.OK:
+        if billing_result.getResponseCode() != 0:
             self._ui_status(
                 "Subscription active, but acknowledgement failed "
                 + str(billing_result.getResponseCode())
