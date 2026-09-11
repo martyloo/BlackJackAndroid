@@ -1418,7 +1418,7 @@ class SubscriptionGate(BoxLayout):
             text="RESTORE / CHECK SUBSCRIPTION",
             size_hint_y=None,
             height=dp(48),
-            disabled=True,
+            disabled=False,
         )
         attach_button_feedback(self.restore_button)
         self.restore_button.bind(on_release=lambda *_: self.app.billing.check_entitlement())
@@ -1558,27 +1558,42 @@ if platform == "android":
 
 
 class GooglePlayBilling:
-    """Small Google Play Billing wrapper for the one monthly subscription."""
+    """Google Play Billing 9 wrapper for the monthly subscription."""
 
     def __init__(self, app):
         self.app = app
         self.client = None
         self.product_details = None
 
-        # Keep listener objects alive for the lifetime of BillingClient.
+        # Keep Java listener proxy objects alive.
         self.purchases_updated_listener = None
         self.connection_listener = None
         self.product_details_listener = None
         self.purchases_response_listener = None
         self.ack_listener = None
 
+        self._connected_handled = False
+        self._connection_timeout = None
+        self._connection_poll = None
+
     def start(self):
         if platform != "android":
-            # Desktop is used as a development preview only.
             Clock.schedule_once(lambda _dt: self.app.set_entitled(True), 0)
             return
 
+        self._ui_status("Connecting to Google Play...")
+
         try:
+            # Close an old client before making a fresh connection attempt.
+            if self.client is not None:
+                try:
+                    self.client.endConnection()
+                except Exception:
+                    pass
+
+            self._connected_handled = False
+            self.product_details = None
+
             self.purchases_updated_listener = _PurchasesUpdatedListener(self)
             self.connection_listener = _BillingClientStateListener(self)
             self.product_details_listener = _ProductDetailsResponseListener(self)
@@ -1591,32 +1606,139 @@ class GooglePlayBilling:
                 .build()
             )
 
+            # Billing Library 8+ / 9 supports automatic reconnection.
             self.client = (
                 BillingClient.newBuilder(PythonActivity.mActivity)
                 .setListener(self.purchases_updated_listener)
                 .enablePendingPurchases(pending_params)
+                .enableAutoServiceReconnection()
                 .build()
             )
+
             self.client.startConnection(self.connection_listener)
 
-        except Exception as exc:
-            self._ui_status("Google Play Billing could not start: " + str(exc))
+            # Pyjnius callbacks should fire normally, but also poll isReady().
+            # This prevents the app sitting forever on "Checking..." if a Java
+            # callback is delayed or swallowed on a particular device.
+            if self._connection_poll is not None:
+                self._connection_poll.cancel()
+            if self._connection_timeout is not None:
+                self._connection_timeout.cancel()
 
-    def _on_billing_setup_finished(self, billing_result):
-        if billing_result.getResponseCode() == BillingClient.BillingResponseCode.OK:
-            self._ui_ready()
-            self.query_product_details()
-            self.check_entitlement()
-        else:
-            self._ui_status(
-                "Google Play Billing error: " + billing_result.getDebugMessage()
+            self._connection_poll = Clock.schedule_interval(
+                self._poll_connection, 0.75
+            )
+            self._connection_timeout = Clock.schedule_once(
+                self._connection_timed_out, 15.0
             )
 
+        except Exception as exc:
+            self._cancel_connection_watchers()
+            self._ui_status(
+                "Google Play Billing could not start: "
+                + type(exc).__name__
+                + ": "
+                + str(exc)
+            )
+            self._ui_ready()
+
+    def _cancel_connection_watchers(self):
+        if self._connection_poll is not None:
+            try:
+                self._connection_poll.cancel()
+            except Exception:
+                pass
+            self._connection_poll = None
+
+        if self._connection_timeout is not None:
+            try:
+                self._connection_timeout.cancel()
+            except Exception:
+                pass
+            self._connection_timeout = None
+
+    def _poll_connection(self, _dt):
+        try:
+            if self.client is not None and self.client.isReady():
+                self._after_connected()
+                return False
+        except Exception as exc:
+            self._cancel_connection_watchers()
+            self._ui_status(
+                "Google Play connection check failed: "
+                + type(exc).__name__
+                + ": "
+                + str(exc)
+            )
+            self._ui_ready()
+            return False
+
+        return True
+
+    def _connection_timed_out(self, _dt):
+        try:
+            ready = bool(self.client is not None and self.client.isReady())
+        except Exception:
+            ready = False
+
+        if ready:
+            self._after_connected()
+            return
+
+        self._cancel_connection_watchers()
+        self._ui_status(
+            "Google Play did not connect. Make sure this app was installed "
+            "from Google Play using a tester/eligible Google account, then "
+            "tap RESTORE / CHECK SUBSCRIPTION to retry."
+        )
+        self._ui_ready()
+
+    def _after_connected(self):
+        if self._connected_handled:
+            return
+
+        self._connected_handled = True
+        self._cancel_connection_watchers()
+        self._ui_status("Connected to Google Play. Checking subscription...")
+        self._ui_ready()
+        self.query_product_details()
+        self.check_entitlement()
+
+    def _on_billing_setup_finished(self, billing_result):
+        try:
+            code = billing_result.getResponseCode()
+            message = str(billing_result.getDebugMessage())
+
+            if code == BillingClient.BillingResponseCode.OK:
+                self._after_connected()
+            else:
+                self._cancel_connection_watchers()
+                self._ui_status(
+                    "Google Play Billing error "
+                    + str(code)
+                    + ": "
+                    + message
+                )
+                self._ui_ready()
+        except Exception as exc:
+            self._cancel_connection_watchers()
+            self._ui_status(
+                "Billing setup callback error: "
+                + type(exc).__name__
+                + ": "
+                + str(exc)
+            )
+            self._ui_ready()
+
     def _on_billing_disconnected(self):
-        self._ui_status("Google Play connection lost. Tap Restore to try again.")
+        self._ui_status(
+            "Google Play connection lost. Tap RESTORE / CHECK SUBSCRIPTION."
+        )
+        self._ui_ready()
 
     def query_product_details(self):
         if not self.client or not self.client.isReady():
+            self._ui_status("Google Play is not connected yet.")
             return
 
         try:
@@ -1636,29 +1758,51 @@ class GooglePlayBilling:
                 .build()
             )
 
+            self._ui_status("Loading subscription from Google Play...")
             self.client.queryProductDetailsAsync(
                 params,
                 self.product_details_listener
             )
         except Exception as exc:
-            self._ui_status("Could not load subscription: " + str(exc))
+            self._ui_status(
+                "Could not load subscription: "
+                + type(exc).__name__
+                + ": "
+                + str(exc)
+            )
 
     def _on_product_details_response(self, billing_result, query_result):
-        if billing_result.getResponseCode() != BillingClient.BillingResponseCode.OK:
-            self._ui_status(
-                "Could not load subscription: " + billing_result.getDebugMessage()
-            )
-            return
+        try:
+            code = billing_result.getResponseCode()
+            if code != BillingClient.BillingResponseCode.OK:
+                self._ui_status(
+                    "Could not load subscription "
+                    + str(code)
+                    + ": "
+                    + str(billing_result.getDebugMessage())
+                )
+                return
 
-        details_list = query_result.getProductDetailsList()
-        if details_list is None or details_list.size() == 0:
-            self._ui_status(
-                "Subscription not found. Check that blackjack_premium is active in Play Console."
-            )
-            return
+            details_list = query_result.getProductDetailsList()
+            if details_list is None or details_list.size() == 0:
+                self._ui_status(
+                    "Subscription blackjack_premium was not returned by "
+                    "Google Play. Check that the product/base plan/offer are "
+                    "active and that this account can access this app version."
+                )
+                return
 
-        self.product_details = details_list.get(0)
-        self._ui_status("Subscription ready.")
+            self.product_details = details_list.get(0)
+            self._ui_status("Subscription ready.")
+            self._ui_ready()
+
+        except Exception as exc:
+            self._ui_status(
+                "Subscription response error: "
+                + type(exc).__name__
+                + ": "
+                + str(exc)
+            )
 
     def start_purchase(self):
         """Launch Google's subscription purchase sheet."""
@@ -1666,12 +1810,15 @@ class GooglePlayBilling:
             return
 
         if not self.client or not self.client.isReady():
-            self._ui_status("Connecting to Google Play...")
+            self._ui_status("Reconnecting to Google Play...")
             self.start()
             return
 
         if self.product_details is None:
-            self._ui_status("Loading subscription...")
+            self._ui_status(
+                "Loading subscription. Tap START 3-DAY FREE TRIAL again "
+                "in a moment."
+            )
             self.query_product_details()
             return
 
@@ -1679,13 +1826,12 @@ class GooglePlayBilling:
             offers = self.product_details.getSubscriptionOfferDetails()
             if offers is None or offers.size() == 0:
                 self._ui_status(
-                    "No eligible subscription offer is available for this Google account."
+                    "No eligible subscription offer is available for this "
+                    "Google account."
                 )
                 return
 
             # Prefer an eligible offer whose first pricing phase is free.
-            # If the account is no longer trial-eligible, fall back to the first
-            # eligible offer/base-plan offer returned by Google Play.
             selected_offer = None
 
             for index in range(offers.size()):
@@ -1724,34 +1870,51 @@ class GooglePlayBilling:
 
             if result.getResponseCode() != BillingClient.BillingResponseCode.OK:
                 self._ui_status(
-                    "Could not start purchase: " + result.getDebugMessage()
+                    "Could not start purchase "
+                    + str(result.getResponseCode())
+                    + ": "
+                    + str(result.getDebugMessage())
                 )
 
         except Exception as exc:
-            self._ui_status("Could not start purchase: " + str(exc))
+            self._ui_status(
+                "Could not start purchase: "
+                + type(exc).__name__
+                + ": "
+                + str(exc)
+            )
 
     def _on_purchases_updated(self, billing_result, purchases):
-        code = billing_result.getResponseCode()
+        try:
+            code = billing_result.getResponseCode()
 
-        if code == BillingClient.BillingResponseCode.OK and purchases is not None:
-            self._process_purchase_list(purchases)
-        elif code == BillingClient.BillingResponseCode.USER_CANCELED:
-            self._ui_status("Purchase cancelled.")
-        else:
+            if code == BillingClient.BillingResponseCode.OK and purchases is not None:
+                self._process_purchase_list(purchases)
+            elif code == BillingClient.BillingResponseCode.USER_CANCELED:
+                self._ui_status("Purchase cancelled.")
+            else:
+                self._ui_status(
+                    "Purchase error "
+                    + str(code)
+                    + ": "
+                    + str(billing_result.getDebugMessage())
+                )
+        except Exception as exc:
             self._ui_status(
-                "Purchase error: " + billing_result.getDebugMessage()
+                "Purchase callback error: "
+                + type(exc).__name__
+                + ": "
+                + str(exc)
             )
 
     def check_entitlement(self):
-        """Restore/check active subscriptions every time the app starts."""
+        """Restore/check active subscriptions."""
         if platform != "android":
             self.app.set_entitled(True)
             return
 
         if not self.client or not self.client.isReady():
-            self._ui_status("Connecting to Google Play...")
-            if self.client is None:
-                self.start()
+            self.start()
             return
 
         try:
@@ -1760,21 +1923,39 @@ class GooglePlayBilling:
                 .setProductType(BillingClient.ProductType.SUBS)
                 .build()
             )
+
+            self._ui_status("Checking active subscription...")
             self.client.queryPurchasesAsync(
                 params,
                 self.purchases_response_listener
             )
         except Exception as exc:
-            self._ui_status("Could not check subscription: " + str(exc))
+            self._ui_status(
+                "Could not check subscription: "
+                + type(exc).__name__
+                + ": "
+                + str(exc)
+            )
 
     def _on_query_purchases_response(self, billing_result, purchases):
-        if billing_result.getResponseCode() != BillingClient.BillingResponseCode.OK:
-            self._ui_status(
-                "Could not check subscription: " + billing_result.getDebugMessage()
-            )
-            return
+        try:
+            if billing_result.getResponseCode() != BillingClient.BillingResponseCode.OK:
+                self._ui_status(
+                    "Could not check subscription "
+                    + str(billing_result.getResponseCode())
+                    + ": "
+                    + str(billing_result.getDebugMessage())
+                )
+                return
 
-        self._process_purchase_list(purchases)
+            self._process_purchase_list(purchases)
+        except Exception as exc:
+            self._ui_status(
+                "Subscription check callback error: "
+                + type(exc).__name__
+                + ": "
+                + str(exc)
+            )
 
     def _process_purchase_list(self, purchases):
         entitled = False
@@ -1797,14 +1978,16 @@ class GooglePlayBilling:
 
                 state = purchase.getPurchaseState()
 
-                if state == PurchaseState.PURCHASED:
+                # Google Play currently uses 1 = PURCHASED, 2 = PENDING.
+                # Numeric comparison avoids relying on Pyjnius resolving the
+                # nested @PurchaseState annotation class at runtime.
+                if state == 1:
                     entitled = True
 
-                    # A new subscription purchase must be acknowledged.
                     if not purchase.isAcknowledged():
                         self._acknowledge(purchase.getPurchaseToken())
 
-                elif state == PurchaseState.PENDING:
+                elif state == 2:
                     pending = True
 
         if entitled:
@@ -1815,7 +1998,11 @@ class GooglePlayBilling:
             if pending:
                 self._ui_status("Your Google Play purchase is pending.")
             else:
-                self._ui_status("A subscription is required to use the calculator.")
+                self._ui_status(
+                    "No active subscription found. You can start the 3-day "
+                    "free trial below."
+                )
+                self._ui_ready()
 
     def _acknowledge(self, purchase_token):
         try:
@@ -1826,13 +2013,20 @@ class GooglePlayBilling:
             )
             self.client.acknowledgePurchase(params, self.ack_listener)
         except Exception as exc:
-            self._ui_status("Purchase acknowledgement error: " + str(exc))
+            self._ui_status(
+                "Purchase acknowledgement error: "
+                + type(exc).__name__
+                + ": "
+                + str(exc)
+            )
 
     def _on_acknowledge_response(self, billing_result):
         if billing_result.getResponseCode() != BillingClient.BillingResponseCode.OK:
             self._ui_status(
-                "Subscription active, but acknowledgement failed: "
-                + billing_result.getDebugMessage()
+                "Subscription active, but acknowledgement failed "
+                + str(billing_result.getResponseCode())
+                + ": "
+                + str(billing_result.getDebugMessage())
             )
 
     def _ui_ready(self):
@@ -1850,6 +2044,7 @@ class GooglePlayBilling:
         )
 
     def end(self):
+        self._cancel_connection_watchers()
         if platform == "android" and self.client is not None:
             try:
                 self.client.endConnection()
