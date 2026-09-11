@@ -8,8 +8,8 @@ package.domain = com.aafacilities
 source.dir = .
 source.include_exts = py,png,jpg,jpeg,kv,atlas
 
-version = 1.1.3
-android.numeric_version = 5
+version = 1.1.4
+android.numeric_version = 6
 
 requirements = python3,kivy,pyjnius
 
