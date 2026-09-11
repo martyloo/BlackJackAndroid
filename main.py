@@ -32,8 +32,8 @@ def light_haptic_feedback(*args):
 
             activity = PythonActivity.mActivity
 
-            # The normal vibrator service is the most reliable route through
-            # Pyjnius and works on modern Android too.
+            # Use the standard vibrator service. This is reliable through
+            # Pyjnius on both older and newer Android versions.
             vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE)
 
             if vibrator is None or not vibrator.hasVibrator():
@@ -299,7 +299,7 @@ class MyWidget(BoxLayout):
         self.decks_combo.currentIndexChanged_connect(self.select_decks)
         self.top_value_box.on_change(self.update_new_value_box)
 
-        metrics = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(108))
+        metrics = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(92))
         self._field_pair(metrics, 'Cards dealt', self.top_value_box)
         self._field_pair(metrics, 'Cards left', self.new_value_box)
         self._field_pair(metrics, 'Decks left', self.decks_left_box)
@@ -319,10 +319,10 @@ class MyWidget(BoxLayout):
         # ---------- COUNT CARD ----------
         self.add_widget(self._section_title('CARD COUNT INPUT'))
 
-        count_buttons = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(50))
-        self.addButton = ButtonBox('2–6\n(+1)')
-        self.sevenEightNineButton = ButtonBox('7–9\n(0)')
-        self.subtractButton = ButtonBox('10–A\n(−1)')
+        count_buttons = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(42))
+        self.addButton = ButtonBox('2–6\n+1')
+        self.sevenEightNineButton = ButtonBox('7–9\n0')
+        self.subtractButton = ButtonBox('10–A\n−1')
 
         # Different tones make the three count groups easier to identify.
         self.addButton.widget.background_color = (0.12, 0.40, 0.25, 1)
@@ -331,35 +331,18 @@ class MyWidget(BoxLayout):
 
         for wrapper in (self.addButton, self.sevenEightNineButton, self.subtractButton):
             wrapper.widget.font_size = '13sp'
-            wrapper.widget.halign = 'center'
-            wrapper.widget.valign = 'middle'
-            wrapper.widget.bind(
-                size=lambda button, _value: setattr(button, 'text_size', button.size)
-            )
             count_buttons.add_widget(wrapper.widget)
 
         self.add_widget(count_buttons)
 
         self.addButton.widget.bind(
-            on_release=lambda *_: (
-                light_haptic_feedback(),
-                self.add_one(),
-                self.add_one_to_top_value_box()
-            )
+            on_release=lambda *_: (self.add_one(), self.add_one_to_top_value_box())
         )
         self.sevenEightNineButton.widget.bind(
-            on_release=lambda *_: (
-                light_haptic_feedback(),
-                self.add_seven_eight_nine(),
-                self.add_one_to_top_value_box()
-            )
+            on_release=lambda *_: (self.add_seven_eight_nine(), self.add_one_to_top_value_box())
         )
         self.subtractButton.widget.bind(
-            on_release=lambda *_: (
-                light_haptic_feedback(),
-                self.subtract_one(),
-                self.add_one_to_top_value_box()
-            )
+            on_release=lambda *_: (self.subtract_one(), self.add_one_to_top_value_box())
         )
 
         # ---------- BET ----------
@@ -370,7 +353,7 @@ class MyWidget(BoxLayout):
         self.bet_amount_box = TextBox('0', font_size='12sp')
         self.min_bet_box.on_change(self.update_stake_required)
 
-        bets = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(57))
+        bets = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(47))
         self._field_pair(bets, 'Minimum bet', self.min_bet_box)
         self._field_pair(bets, '100-unit bank', self.stake_required_box)
         self._field_pair(bets, 'SUGGESTED BET', self.bet_amount_box)
@@ -413,7 +396,7 @@ class MyWidget(BoxLayout):
 
         self.insure_textbox = TextBox('', font_size='12sp')
         self.card_label = TextBox('', font_size='12sp')
-        dealer_row = GridLayout(cols=2, spacing=dp(5), size_hint_y=None, height=dp(57))
+        dealer_row = GridLayout(cols=2, spacing=dp(5), size_hint_y=None, height=dp(47))
         self._field_pair(dealer_row, "Dealer's card", self.card_label)
         self._field_pair(dealer_row, 'Insurance', self.insure_textbox)
         self.add_widget(dealer_row)
@@ -424,7 +407,7 @@ class MyWidget(BoxLayout):
         self.your_cards_textbox4 = TextBox('', font_size='11sp')
         self.your_cards_textbox5 = TextBox('', font_size='11sp')
 
-        cards_row = GridLayout(cols=5, spacing=dp(4), size_hint_y=None, height=dp(54))
+        cards_row = GridLayout(cols=5, spacing=dp(4), size_hint_y=None, height=dp(44))
         for index, box in enumerate([
             self.your_cards_textbox1, self.your_cards_textbox2,
             self.your_cards_textbox3, self.your_cards_textbox4,
@@ -436,12 +419,12 @@ class MyWidget(BoxLayout):
         # ---------- DECISION ----------
         self.add_widget(self._section_title('RECOMMENDED PLAY'))
 
-        self.strategy_textbox = TextBox('', font_size='22sp')
+        self.strategy_textbox = TextBox('', font_size='24sp')
         self.total_box = TextBox('', font_size='18sp')
 
         # Large central recommendation; the existing strategy code still writes
         # to self.strategy_textbox exactly as before.
-        result_row = BoxLayout(orientation='horizontal', spacing=dp(5), size_hint_y=None, height=dp(80))
+        result_row = BoxLayout(orientation='horizontal', spacing=dp(5), size_hint_y=None, height=dp(64))
 
         strategy_holder = BoxLayout(orientation='vertical', spacing=dp(2))
         strategy_holder.add_widget(self._label('ACTION', '10sp'))
